@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Building2, Calendar, MapPin, Link, FileText, Briefcase } from "lucide-react"
-
+import axios from "axios"
 const AddJobForm = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -31,22 +31,37 @@ const AddJobForm = () => {
     }))
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    // Form submission logic would go here
-    console.log("Job application submitted:", formData)
-    alert("Job application added successfully!")
+const handleSubmit = async (e) => {
+  e.preventDefault(); // always at top
+  try {
+    const response = await axios.post(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/add`,
+      formData
+    );
+    console.log("Response:", response.data);
+    alert("Job application added successfully!");
+
     // Reset form after submission
     setFormData({
       jobTitle: "",
       company: "",
-      status: "applied",
+      position: "",
       applicationDate: "",
-      notes: "",
+      note: "",
       jobLink: "",
       location: "",
-    })
+    });
+  } catch (error) {
+    console.error(
+      "Error adding job application:",
+      error.response?.data || error.message
+    );
+    alert(
+      "There was an error adding your job application. Please try again."
+    );
   }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
