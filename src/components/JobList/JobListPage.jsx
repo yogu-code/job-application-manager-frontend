@@ -1,8 +1,9 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import SearchBar from "./SearchBar"
 import JobList from "./JobList"
+import axios from "axios"
 
 const JobListPage = () => {
   const router = useRouter()
@@ -10,38 +11,7 @@ const JobListPage = () => {
   const [statusFilter, setStatusFilter] = useState("all")
   const [locationFilter, setLocationFilter] = useState("all")
 
-  const [jobs, setJobs] = useState([
-    {
-      id: 1,
-      jobTitle: "Frontend Developer",
-      company: "Tech Solutions Inc.",
-      status: "interviewing",
-      applicationDate: "2023-05-15",
-      location: "San Francisco, CA",
-      notes: "Initial phone screening completed. Technical interview scheduled for next week.",
-      jobLink: "https://example.com/job1",
-    },
-    {
-      id: 2,
-      jobTitle: "UI/UX Designer",
-      company: "Creative Studios",
-      status: "applied",
-      applicationDate: "2023-05-20",
-      location: "Remote",
-      notes: "Submitted portfolio. Waiting for response.",
-      jobLink: "https://example.com/job2",
-    },
-    {
-      id: 3,
-      jobTitle: "Full Stack Engineer",
-      company: "Innovate Corp",
-      status: "offer",
-      applicationDate: "2023-04-30",
-      location: "New York, NY",
-      notes: "Received offer! Negotiating salary and benefits.",
-      jobLink: "https://example.com/job3",
-    },
-  ])
+  const [jobs, setJobs] = useState([])
 
   const [showModal, setShowModal] = useState(false)
   const [editingJob, setEditingJob] = useState(null)
@@ -55,13 +25,13 @@ const JobListPage = () => {
     location: "",
   })
 
-  const statuses = [
-    { id: "applied", label: "Applied", color: "bg-blue-100 text-blue-800" },
-    { id: "interviewing", label: "Interviewing", color: "bg-yellow-100 text-yellow-800" },
-    { id: "offer", label: "Offer Received", color: "bg-green-100 text-green-800" },
-    { id: "rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
-    { id: "withdrawn", label: "Withdrawn", color: "bg-gray-100 text-gray-800" },
-  ]
+const statuses = [
+  { id: "Applied", label: "Applied", color: "bg-blue-100 text-blue-800" },
+  { id: "Interviewing", label: "Interviewing", color: "bg-yellow-100 text-yellow-800" },
+  { id: "Offer", label: "Offer Received", color: "bg-green-100 text-green-800" },
+  { id: "Rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
+  { id: "Withdrawn", label: "Withdrawn", color: "bg-gray-100 text-gray-800" },
+]
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -82,6 +52,26 @@ const JobListPage = () => {
     const locations = [...new Set(jobs.map((job) => job.location))]
     return locations.filter(Boolean)
   }, [jobs])
+
+useEffect(() => {
+  const fetchJobs = async () => {
+    try {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/all`)
+      const normalizedJobs = response.data.map(job => ({
+        ...job,
+        status: job.status?.trim() || "Applied", // normalize casing/trim whitespace
+        notes: job.notes || job.note || "" // ensure notes exist
+      }))
+      setJobs(normalizedJobs)
+    } catch (error) {
+      console.error("Error fetching jobs:", error.response?.data || error.message)
+      alert("There was an error fetching job applications. Please try again.")
+    }
+  }
+
+  fetchJobs()
+}, [])
+
 
   const handleAddJob = () => {
     setEditingJob(null)
@@ -144,15 +134,15 @@ const JobListPage = () => {
     handleCloseModal()
   }
 
-  const getStatusColor = (statusId) => {
-    const status = statuses.find((s) => s.id === statusId)
-    return status ? status.color : "bg-gray-100 text-gray-800"
-  }
+  // const getStatusColor = (statusId) => {
+  //   const status = statuses.find((s) => s.id === statusId)
+  //   return status ? status.color : "bg-gray-100 text-gray-800"
+  // }
 
-  const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "short", day: "numeric" }
-    return new Date(dateString).toLocaleDateString(undefined, options)
-  }
+  // const formatDate = (dateString) => {
+  //   const options = { year: "numeric", month: "short", day: "numeric" }
+  //   return new Date(dateString).toLocaleDateString(undefined, options)
+  // }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4 sm:px-6 lg:px-8">
