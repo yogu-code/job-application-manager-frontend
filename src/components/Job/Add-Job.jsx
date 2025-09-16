@@ -235,7 +235,7 @@ const handleSubmit = async (e) => {
             <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => router.push('/job')}
+                onClick={() => router.push('/applications')}
                 className="px-6 py-3 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 font-medium"
               >
                 Cancel
