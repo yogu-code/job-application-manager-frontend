@@ -10,6 +10,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useState } from "react";
+import axios from "axios";
 const JobList = ({
   jobs,
   statuses,
@@ -20,7 +21,6 @@ const JobList = ({
 }) => {
   const [selectedJob, setSelectedJob] = useState(null); // 👈 modal state
   const [editingJob, setEditingJob] = useState(null); // for editing
-  console.log("Jobs in JobList:", jobs);
   const getStatusColor = (statusId) => {
     const status = statuses.find(
       (s) => s.id.toLowerCase() === statusId.toLowerCase()
@@ -34,11 +34,33 @@ const JobList = ({
   };
 
   // handle update form submit
-  const handleUpdateSubmit = (e) => {
-    e.preventDefault();
-    if (editingJob) {
-      onEditJob(editingJob); // send updated job back to parent
+  const handleUpdateJob = async (jobData) => {
+    try {
+      const { data } = await axios.put(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobData._id}`,
+        jobData
+      );
+      alert("Job updated successfully");
       setEditingJob(null);
+      window.location.reload(); // temporary, better: update local state
+      return data;
+    } catch (error) {
+      console.error("Error updating job:", error);
+      alert("Failed to update job");
+    }
+  };
+
+  const handleDeleteJob = async (jobId) => {
+    try {
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobId}`
+      );
+      alert("Job deleted successfully");
+      // Refresh page OR remove from local state if jobs are managed here
+      window.location.reload(); // temporary, better: use state update
+    } catch (error) {
+      console.error("Error deleting job:", error);
+      alert("Failed to delete job");
     }
   };
 
@@ -140,7 +162,10 @@ const JobList = ({
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => onDeleteJob(job._id)}
+                      onClick={() => {
+                        onDeleteJob(job._id);
+                        handleDeleteJob(job._id);
+                      }}
                       className="inline-flex items-center p-2 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-white hover:bg-red-50"
                       title="Delete Job"
                     >
@@ -269,6 +294,7 @@ const JobList = ({
                 e.preventDefault();
                 onEditJob(editingJob);
                 setEditingJob(null);
+                handleUpdateJob(editingJob);
               }}
               className="space-y-5"
             >

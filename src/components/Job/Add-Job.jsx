@@ -47,7 +47,7 @@ const handleSubmit = async (e) => {
       company: "",
       position: "",
       applicationDate: "",
-      note: "",
+      notes: "",
       jobLink: "",
       location: "",
     });
