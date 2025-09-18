@@ -10,7 +10,7 @@ export default function Navbar() {
   const tabs = [
     { name: "overview", href: "/" },
     { name: "applications", href: "/applications" },
-    { name: "interviews", href: "/interviews" },
+    { name: "interviews", href: "/interview" },
     { name: "analytics", href: "/analytics" },
   ];
 
