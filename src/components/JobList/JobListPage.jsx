@@ -71,7 +71,7 @@ const JobListPage = () => {
         );
         const normalizedJobs = response.data.map((job) => ({
           ...job,
-          status: job.status?.trim() || "Applied", // normalize casing/trim whitespace
+          status: job.Status?.trim() ,
           notes: job.notes || job.note || "", // ensure notes exist
         }));
         setJobs(normalizedJobs);

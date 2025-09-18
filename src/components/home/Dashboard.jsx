@@ -1,469 +1,470 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState, useEffect } from "react";
 import {
-  Building,
-  Calendar,
   FileText,
-  TrendingUp,
-  Clock,
+  Calendar,
   CheckCircle,
-  Eye,
-  Plus,
+  Clock,
+  TrendingUp,
+  Briefcase,
+  MapPin,
+  ExternalLink,
   Filter,
   Search,
-  Bell,
-  Settings,
-  User,
-  Briefcase,
-} from "lucide-react"
+  Plus,
+} from "lucide-react";
+import axios from "axios";
 
 const JobTrackerDashboard = () => {
-  const [activeTab, setActiveTab] = useState("overview")
+  const [applications, setApplications] = useState([]);
+  const [filteredApplications, setFilteredApplications] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState("all");
+  const [stats, setStats] = useState({
+    totalApplications: 0,
+    interviews: 0,
+    offers: 0,
+    pending: 0,
+    rejected: 0,
+    weeklyTotal: 0,
+    weeklyInterviews: 0,
+  });
 
-  // Static data
-  const stats = {
-    totalApplications: 47,
-    interviews: 12,
-    offers: 3,
-    pending: 28,
-  }
+  // Fetch applications from backend
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/all`
+        );
 
-  const applications = [
-    {
-      id: 1,
-      company: "Google",
-      position: "Frontend Developer",
-      status: "Interview Scheduled",
-      appliedDate: "2024-01-15",
-      nextAction: "Technical Interview - Jan 22",
-      salary: "$120,000",
-      priority: "high",
-      logo: "🔍",
-    },
-    {
-      id: 2,
-      company: "Meta",
-      position: "React Developer",
-      status: "Applied",
-      appliedDate: "2024-01-14",
-      nextAction: "Follow up in 3 days",
-      salary: "$130,000",
-      priority: "high",
-      logo: "📘",
-    },
-    {
-      id: 3,
-      company: "Netflix",
-      position: "Full Stack Engineer",
-      status: "Phone Screening",
-      appliedDate: "2024-01-10",
-      nextAction: "Waiting for response",
-      salary: "$125,000",
-      priority: "medium",
-      logo: "🎬",
-    },
-    {
-      id: 4,
-      company: "Spotify",
-      position: "Software Engineer",
-      status: "Rejected",
-      appliedDate: "2024-01-08",
-      nextAction: "Apply to similar roles",
-      salary: "$110,000",
-      priority: "low",
-      logo: "🎵",
-    },
-    {
-      id: 5,
-      company: "Airbnb",
-      position: "UI/UX Engineer",
-      status: "Offer Extended",
-      appliedDate: "2024-01-05",
-      nextAction: "Response due Jan 25",
-      salary: "$135,000",
-      priority: "high",
-      logo: "🏠",
-    },
-  ]
+        if (response.status !== 200) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-  const upcomingInterviews = [
-    {
-      company: "Google",
-      position: "Frontend Developer",
-      date: "Jan 22, 2024",
-      time: "2:00 PM",
-      type: "Technical Interview",
-      interviewer: "John Smith",
-    },
-    {
-      company: "Apple",
-      position: "iOS Developer",
-      date: "Jan 24, 2024",
-      time: "10:00 AM",
-      type: "System Design",
-      interviewer: "Sarah Johnson",
-    },
-    {
-      company: "Microsoft",
-      position: "Cloud Engineer",
-      date: "Jan 26, 2024",
-      time: "3:30 PM",
-      type: "Behavioral",
-      interviewer: "Mike Davis",
-    },
-  ]
+        const jobs = response.data;
+
+        // Normalize status for consistency
+        const normalizeStatus = (status) => {
+          if (!status) return "unknown";
+          const s = status.toLowerCase();
+          if (s.includes("Interviewing")) return "interview";
+          if (s.includes("Offer")) return "offer";
+          if (s.includes("Pending")) return "pending";
+          if (s.includes("Rejected")) return "rejected";
+          if (s.includes("Applied")) return "applied";
+          return "unknown";
+        };
+
+        const jobsWithNormalizedStatus = jobs.map((job) => ({
+          ...job,
+          status: normalizeStatus(job.status),
+        }));
+
+        // Calculate stats
+        const total = jobsWithNormalizedStatus.length;
+        const interviews = jobsWithNormalizedStatus.filter(
+          (j) => j.status === "interview"
+        ).length;
+        const offers = jobsWithNormalizedStatus.filter(
+          (j) => j.status === "offer"
+        ).length;
+        const pending = jobsWithNormalizedStatus.filter(
+          (j) => j.status === "pending"
+        ).length;
+        const rejected = jobsWithNormalizedStatus.filter(
+          (j) => j.status === "rejected"
+        ).length;
+
+        // Weekly trends
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+        const recentApplications = jobsWithNormalizedStatus.filter(
+          (job) => new Date(job.createdAt) >= oneWeekAgo
+        );
+
+        const weeklyTotal = recentApplications.length;
+        const weeklyInterviews = recentApplications.filter(
+          (j) => j.status === "interview"
+        ).length;
+
+        // Update state
+        setApplications(jobsWithNormalizedStatus);
+        setFilteredApplications(jobsWithNormalizedStatus);
+        setStats({
+          totalApplications: total,
+          interviews,
+          offers,
+          pending,
+          rejected,
+          weeklyTotal,
+          weeklyInterviews,
+        });
+      } catch (error) {
+        console.error("Error fetching applications:", error);
+
+        // Reset state on error
+        setApplications([]);
+        setFilteredApplications([]);
+        setStats({
+          totalApplications: 0,
+          interviews: 0,
+          offers: 0,
+          pending: 0,
+          rejected: 0,
+          weeklyTotal: 0,
+          weeklyInterviews: 0,
+        });
+      }
+    };
+
+    fetchApplications();
+  }, []);
+
+  // Filter and search functionality with case-insensitive status matching
+  useEffect(() => {
+    let filtered = applications;
+
+    if (selectedFilter !== "all") {
+      filtered = filtered.filter(
+        (app) => app.status?.toLowerCase() === selectedFilter.toLowerCase()
+      );
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (app) =>
+          app.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          app.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          app.location?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredApplications(filtered);
+  }, [applications, selectedFilter, searchTerm]);
 
   const getStatusColor = (status) => {
-    const colors = {
-      Applied: "bg-blue-100 text-blue-800",
-      "Interview Scheduled": "bg-yellow-100 text-yellow-800",
-      "Phone Screening": "bg-purple-100 text-purple-800",
-      "Offer Extended": "bg-green-100 text-green-800",
-      Rejected: "bg-red-100 text-red-800",
-      Accepted: "bg-emerald-100 text-emerald-800",
+    const normalizedStatus = status?.toLowerCase();
+    switch (normalizedStatus) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "interview":
+        return "bg-blue-100 text-blue-800 border-blue-200";
+      case "offer":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200";
+      case "applied":
+        return "bg-purple-100 text-purple-800 border-purple-200";
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200";
     }
-    return colors[status] || "bg-gray-100 text-gray-800"
-  }
+  };
 
-  const getPriorityColor = (priority) => {
-    const colors = {
-      high: "border-l-red-500",
-      medium: "border-l-yellow-500",
-      low: "border-l-green-500",
+  const getStatusIcon = (status) => {
+    const normalizedStatus = status?.toLowerCase();
+    switch (normalizedStatus) {
+      case "pending":
+        return <Clock className="h-4 w-4" />;
+      case "interview":
+        return <Calendar className="h-4 w-4" />;
+      case "offer":
+        return <CheckCircle className="h-4 w-4" />;
+      case "rejected":
+        return <FileText className="h-4 w-4" />;
+      case "applied":
+        return <FileText className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
     }
-    return colors[priority] || "border-l-gray-500"
-  }
+  };
+
+  // Sort applications by created date (most recent first) and limit display
+  const recentApplications = [...filteredApplications]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 9); // Show more applications
+
+  // Format date helper
+  const formatDate = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = now - date;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        return "Today";
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year:
+            date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+        });
+      }
+    } catch (error) {
+      return "Invalid date";
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {activeTab === "overview" && (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-2 bg-indigo-100 rounded-lg">
-                    <FileText className="h-6 w-6 text-indigo-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Applications</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.totalApplications}</p>
-                  </div>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                <Briefcase className="h-8 w-8 text-white" />
               </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <Calendar className="h-6 w-6 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Interviews</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.interviews}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Offers</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.offers}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Clock className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Pending</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.pending}</p>
-                  </div>
-                </div>
+              <div className="ml-4">
+                <h1 className="text-3xl font-bold text-slate-900">
+                  Job Tracker
+                </h1>
+                <p className="text-slate-600">
+                  Monitor your application progress
+                </p>
               </div>
             </div>
+            <button className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg shadow-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105">
+              <Plus className="h-5 w-5 mr-2" />
+              Add Application
+            </button>
+          </div>
+        </div>
+      </div>
 
-            {/* Recent Applications & Upcoming Interviews */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Recent Applications */}
-              <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">Recent Applications</h3>
-                    <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">View all</button>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {applications.slice(0, 3).map((app) => (
-                      <div
-                        key={app.id}
-                        className={`border-l-4 ${getPriorityColor(app.priority)} bg-gray-50 p-4 rounded-r-lg`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center space-x-3">
-                            <div className="text-2xl">{app.logo}</div>
-                            <div>
-                              <h4 className="font-medium text-gray-900">{app.position}</h4>
-                              <p className="text-sm text-gray-600">{app.company}</p>
-                              <p className="text-xs text-gray-500">{app.appliedDate}</p>
-                            </div>
-                          </div>
-                          <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(app.status)}`}
-                          >
-                            {app.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+              <div className="p-3 bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl shadow-lg">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">
+                  Total Applications
+                </p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {stats.totalApplications}
+                </p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                  <span className="text-sm text-green-600">
+                    {stats.weeklyTotal > 0
+                      ? `+${stats.weeklyTotal} this week`
+                      : "No new applications"}
+                  </span>
                 </div>
               </div>
-
-              {/* Upcoming Interviews */}
-              <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-medium text-gray-900">Upcoming Interviews</h3>
-                    <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">View all</button>
-                  </div>
-                </div>
-                <div className="p-6">
-                  <div className="space-y-4">
-                    {upcomingInterviews.map((interview, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{interview.position}</h4>
-                            <p className="text-sm text-gray-600">{interview.company}</p>
-                            <div className="flex items-center space-x-4 mt-2">
-                              <div className="flex items-center space-x-1">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <span className="text-xs text-gray-500">{interview.date}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Clock className="h-4 w-4 text-gray-400" />
-                                <span className="text-xs text-gray-500">{interview.time}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full">
-                            {interview.type}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="mt-8 bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Quick Actions</h3>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                    <Plus className="h-5 w-5 text-gray-500 mr-2" />
-                    <span className="text-sm font-medium text-gray-700">Add Application</span>
-                  </button>
-                  <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                    <Calendar className="h-5 w-5 text-gray-500 mr-2" />
-                    <span className="text-sm font-medium text-gray-700">Schedule Interview</span>
-                  </button>
-                  <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                    <Building className="h-5 w-5 text-gray-500 mr-2" />
-                    <span className="text-sm font-medium text-gray-700">Add Company</span>
-                  </button>
-                  <button className="flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">
-                    <TrendingUp className="h-5 w-5 text-gray-500 mr-2" />
-                    <span className="text-sm font-medium text-gray-700">View Analytics</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* {activeTab === "applications" && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900">All Applications</h3>
-                <div className="flex space-x-3">
-                  <button className="flex items-center px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                  </button>
-                  <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Application
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Company/Position
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Applied Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Salary
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Next Action
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {applications.map((app) => (
-                    <tr key={app.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="text-2xl mr-3">{app.logo}</div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{app.position}</div>
-                            <div className="text-sm text-gray-500">{app.company}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(app.status)}`}>
-                          {app.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{app.appliedDate}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{app.salary}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{app.nextAction}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-indigo-600 hover:text-indigo-900 mr-3">
-                          <Eye className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
-        )}
 
-        {activeTab === "interviews" && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900">Interview Schedule</h3>
-                <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Schedule Interview
-                </button>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+              <div className="p-3 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl shadow-lg">
+                <Calendar className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">Interviews</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {stats.interviews}
+                </p>
+                <div className="flex items-center mt-1">
+                  <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
+                  <span className="text-sm text-green-600">
+                    {stats.weeklyInterviews > 0
+                      ? `+${stats.weeklyInterviews} this week`
+                      : "Keep applying!"}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="p-6">
-              <div className="grid gap-6">
-                {upcomingInterviews.map((interview, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-6">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="text-lg font-medium text-gray-900">{interview.position}</h4>
-                        <p className="text-gray-600">{interview.company}</p>
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                          <div>
-                            <p className="text-sm text-gray-500">Date & Time</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              {interview.date} at {interview.time}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Interview Type</p>
-                            <p className="text-sm font-medium text-gray-900">{interview.type}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Interviewer</p>
-                            <p className="text-sm font-medium text-gray-900">{interview.interviewer}</p>
-                          </div>
-                        </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl shadow-lg">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">Offers</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {stats.offers}
+                </p>
+                <div className="flex items-center mt-1">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
+                  <span className="text-sm text-green-600">
+                    {stats.offers > 0 ? "Congratulations!" : "Keep going!"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover:shadow-xl transition-shadow duration-300">
+            <div className="flex items-center">
+              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg">
+                <Clock className="h-6 w-6 text-white" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-slate-600">Pending</p>
+                <p className="text-3xl font-bold text-slate-900">
+                  {stats.pending}
+                </p>
+                <div className="flex items-center mt-1">
+                  <Clock className="h-4 w-4 text-blue-500 mr-1" />
+                  <span className="text-sm text-blue-600">
+                    {stats.pending > 0 ? "Awaiting response" : "All caught up!"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filter Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8 border border-slate-200">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search applications..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+              />
+            </div>
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+              <select
+                value={selectedFilter}
+                onChange={(e) => setSelectedFilter(e.target.value)}
+                className="pl-10 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="interview">Interview</option>
+                <option value="offer">Offer</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Applications Grid */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200">
+          <div className="p-6 border-b border-slate-200">
+            <h3 className="text-xl font-bold text-slate-900">
+              Recent Applications
+            </h3>
+            <p className="text-slate-600 mt-1">
+              Your latest job applications and their status
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recentApplications.map((app) => (
+                <div
+                  key={app._id}
+                  className="group relative bg-slate-50 rounded-xl border border-slate-200 p-6 hover:bg-white hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-slate-900 text-lg group-hover:text-blue-600 transition-colors duration-200">
+                        {app.position || "Position not specified"}
+                      </h4>
+                      <p className="text-slate-600 font-medium">
+                        {app.company || "Company not specified"}
+                      </p>
+                    </div>
+                    {app.applicationUrl && (
+                      <a
+                        href={app.applicationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                        title="Open application link"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center text-slate-600">
+                      <MapPin className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span className="text-sm truncate">
+                        {app.location || "Location not specified"}
+                      </span>
+                    </div>
+
+                    {app.salary && (
+                      <div className="flex items-center text-slate-600">
+                        <Briefcase className="h-4 w-4 mr-2 flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">
+                          {app.salary}
+                        </span>
                       </div>
-                      <div className="flex flex-col space-y-2">
-                        <button className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                          Prepare
-                        </button>
-                        <button className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
-                          Reschedule
-                        </button>
-                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+                          app.status
+                        )}`}
+                      >
+                        {getStatusIcon(app.status)}
+                        <span className="ml-1 capitalize">
+                          {app.status || "Unknown"}
+                        </span>
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {formatDate(app.createdAt)}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
 
-        {activeTab === "analytics" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Application Success Rate</h3>
-                <div className="text-3xl font-bold text-indigo-600">25.5%</div>
-                <p className="text-sm text-gray-500 mt-2">12 interviews from 47 applications</p>
+            {filteredApplications.length === 0 && applications.length > 0 && (
+              <div className="text-center py-12">
+                <Search className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No applications found
+                </h3>
+                <p className="text-slate-600">
+                  Try adjusting your search or filter criteria.
+                </p>
               </div>
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Average Response Time</h3>
-                <div className="text-3xl font-bold text-green-600">5.2 days</div>
-                <p className="text-sm text-gray-500 mt-2">Companies typically respond within a week</p>
+            )}
+
+            {applications.length === 0 && (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-900 mb-2">
+                  No applications yet
+                </h3>
+                <p className="text-slate-600">
+                  Start by adding your first job application to track your
+                  progress.
+                </p>
               </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Application Status Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">28</div>
-                  <div className="text-sm text-gray-500">Pending</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-600">12</div>
-                  <div className="text-sm text-gray-500">Interviews</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">3</div>
-                  <div className="text-sm text-gray-500">Offers</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">4</div>
-                  <div className="text-sm text-gray-500">Rejected</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-600">47</div>
-                  <div className="text-sm text-gray-500">Total</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-        )} */}
+        </div>
       </main>
     </div>
-  )
-}
+  );
+};
 
-export default JobTrackerDashboard
+export default JobTrackerDashboard;

@@ -33,6 +33,21 @@ const JobList = ({
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  // update only status
+  const handleStatusUpdate = async (jobId, newStatus) => {
+    try {
+      const { data } = await axios.patch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobId}`,
+        { status: newStatus } // 👈 only updating status
+      );
+      console.log("Status updated:", data);
+      onStatusChange(jobId, newStatus); // keep local state in sync
+    } catch (error) {
+      console.error("Error updating status:", error);
+      alert("Failed to update status");
+    }
+  };
+
   // handle update form submit
   const handleUpdateJob = async (jobData) => {
     try {
@@ -114,8 +129,8 @@ const JobList = ({
                           <select
                             value={job.status}
                             onChange={(e) =>
-                              onStatusChange(job._id, e.target.value)
-                            }
+                              handleStatusUpdate(job._id, e.target.value)
+                            } // 👈 direct call
                             className={`ml-3 inline-flex text-xs leading-5 font-semibold rounded-full px-3 py-1 ${getStatusColor(
                               job.status
                             )}`}
