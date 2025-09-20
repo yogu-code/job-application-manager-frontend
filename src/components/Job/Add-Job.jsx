@@ -1,67 +1,77 @@
-"use client"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Building2, Calendar, MapPin, Link, FileText, Briefcase } from "lucide-react"
-import axios from "axios"
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Building2,
+  Calendar,
+  MapPin,
+  Link,
+  FileText,
+  Briefcase,
+} from "lucide-react";
+import axios from "axios";
 const AddJobForm = () => {
   const router = useRouter();
   const [formData, setFormData] = useState({
     jobTitle: "",
     company: "",
-    status: "applied",
+    status: "Applied",
     applicationDate: "",
     notes: "",
     jobLink: "",
     location: "",
-  })
+  });
 
+  // Define valid statuses with labels + colors
   const statuses = [
-    { id: "applied", label: "Applied", color: "bg-blue-100 text-blue-800" },
-    { id: "interviewing", label: "Interviewing", color: "bg-yellow-100 text-yellow-800" },
-    { id: "offer", label: "Offer Received", color: "bg-green-100 text-green-800" },
-    { id: "rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
-    { id: "withdrawn", label: "Withdrawn", color: "bg-gray-100 text-gray-800" },
-  ]
+    { id: "Applied", label: "Applied", color: "bg-blue-100 text-blue-800" },
+    {
+      id: "Interview",
+      label: "Interview",
+      color: "bg-yellow-100 text-yellow-800",
+    },
+    { id: "Offer", label: "Offer", color: "bg-green-100 text-green-800" },
+    { id: "Rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
+  ];
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
-  }
+    }));
+  };
 
-const handleSubmit = async (e) => {
-  e.preventDefault(); // always at top
-  try {
-    const response = await axios.post(
-      `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/add`,
-      formData
-    );
-    console.log("Response:", response.data);
-    alert("Job application added successfully!");
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // always at top
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/add`,
+        formData
+      );
+      console.log("Response:", response.data);
+      alert("Job application added successfully!");
 
-    // Reset form after submission
-    setFormData({
-      jobTitle: "",
-      company: "",
-      position: "",
-      applicationDate: "",
-      notes: "",
-      jobLink: "",
-      location: "",
-    });
-  } catch (error) {
-    console.error(
-      "Error adding job application:",
-      error.response?.data || error.message
-    );
-    alert(
-      "There was an error adding your job application. Please try again."
-    );
-  }
-};
-
+      // Reset form after submission
+      setFormData({
+        jobTitle: "",
+        company: "",
+        position: "",
+        applicationDate: "",
+        notes: "",
+        jobLink: "",
+        location: "",
+      });
+    } catch (error) {
+      console.error(
+        "Error adding job application:",
+        error.response?.data || error.message
+      );
+      alert(
+        "There was an error adding your job application. Please try again."
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 px-4">
@@ -71,17 +81,24 @@ const handleSubmit = async (e) => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
             <Briefcase className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Add New Job Application</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Add New Job Application
+          </h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Keep track of your job applications and stay organized throughout your job search journey.
+            Keep track of your job applications and stay organized throughout
+            your job search journey.
           </p>
         </div>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
-            <h2 className="text-xl font-semibold text-white">Application Details</h2>
-            <p className="text-blue-100 mt-1">Fill in the information about your job application</p>
+            <h2 className="text-xl font-semibold text-white">
+              Application Details
+            </h2>
+            <p className="text-blue-100 mt-1">
+              Fill in the information about your job application
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 space-y-8">
@@ -89,7 +106,9 @@ const handleSubmit = async (e) => {
             <div className="space-y-6">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
                 <Briefcase className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Basic Information</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Basic Information
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -131,7 +150,9 @@ const handleSubmit = async (e) => {
             <div className="space-y-6">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
                 <Calendar className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Application Details</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Application Details
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -151,7 +172,9 @@ const handleSubmit = async (e) => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">Status</label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    Status
+                  </label>
                   <select
                     name="status"
                     value={formData.status}
@@ -172,7 +195,9 @@ const handleSubmit = async (e) => {
             <div className="space-y-6">
               <div className="flex items-center gap-3 pb-3 border-b border-gray-200">
                 <Link className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900">Additional Information</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Additional Information
+                </h3>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -235,7 +260,7 @@ const handleSubmit = async (e) => {
             <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 border-t border-gray-200">
               <button
                 type="button"
-                onClick={() => router.push('/applications')}
+                onClick={() => router.push("/applications")}
                 className="px-6 py-3 text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 font-medium"
               >
                 Cancel
@@ -251,7 +276,7 @@ const handleSubmit = async (e) => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default AddJobForm
+export default AddJobForm;

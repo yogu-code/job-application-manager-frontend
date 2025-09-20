@@ -22,8 +22,9 @@ const JobList = ({
   const [selectedJob, setSelectedJob] = useState(null); // 👈 modal state
   const [editingJob, setEditingJob] = useState(null); // for editing
   const getStatusColor = (statusId) => {
+    console.log("Getting color for status:", statusId);
     const status = statuses.find(
-      (s) => s.id.toLowerCase() === statusId.toLowerCase()
+      (s) => s.id === statusId
     );
     return status ? status.color : "bg-gray-100 text-gray-800";
   };

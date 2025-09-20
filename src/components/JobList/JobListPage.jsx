@@ -18,27 +18,23 @@ const JobListPage = () => {
   const [formData, setFormData] = useState({
     jobTitle: "",
     company: "",
-    status: "applied",
+    status: "",
     applicationDate: "",
     notes: "",
     jobLink: "",
     location: "",
   });
 
+  // Define valid statuses with labels + colors
   const statuses = [
     { id: "Applied", label: "Applied", color: "bg-blue-100 text-blue-800" },
     {
-      id: "Interviewing",
-      label: "Interviewing",
+      id: "Interview",
+      label: "Interview",
       color: "bg-yellow-100 text-yellow-800",
     },
-    {
-      id: "Offer",
-      label: "Offer Received",
-      color: "bg-green-100 text-green-800",
-    },
+    { id: "Offer", label: "Offer", color: "bg-green-100 text-green-800" },
     { id: "Rejected", label: "Rejected", color: "bg-red-100 text-red-800" },
-    { id: "Withdrawn", label: "Withdrawn", color: "bg-gray-100 text-gray-800" },
   ];
 
   const filteredJobs = useMemo(() => {
@@ -71,8 +67,8 @@ const JobListPage = () => {
         );
         const normalizedJobs = response.data.map((job) => ({
           ...job,
-          status: job.Status?.trim() ,
-          notes: job.notes || job.note || "", // ensure notes exist
+          status: job.status,
+          notes: job.notes || job.note || "",
         }));
         setJobs(normalizedJobs);
       } catch (error) {
@@ -80,12 +76,8 @@ const JobListPage = () => {
           "Error fetching jobs:",
           error.response?.data || error.message
         );
-        alert(
-          "There was an error fetching job applications. Please try again."
-        );
       }
     };
-
     fetchJobs();
   }, []);
 
