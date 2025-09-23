@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
@@ -7,83 +7,245 @@ import {
 import { 
   TrendingUp, TrendingDown, Target, Calendar, Building, Users, 
   Award, Clock, CheckCircle, XCircle, AlertCircle, Eye,
-  Filter, Download, RefreshCw, ArrowUp, ArrowDown
+  Filter, Download, RefreshCw, ArrowUp, ArrowDown, Briefcase
 } from 'lucide-react';
+import axios from 'axios';
 
 const AnalyticsDashboard = () => {
   const [timeRange, setTimeRange] = useState('6months');
   const [filterType, setFilterType] = useState('all');
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data for analytics
-  const overallStats = {
-    totalApplications: 145,
-    accepted: 12,
-    rejected: 89,
-    pending: 44,
-    interviews: 18,
-    offers: 6,
-    successRate: 8.3, // (accepted/total) * 100
-    interviewRate: 12.4, // (interviews/total) * 100
-    offerRate: 4.1, // (offers/total) * 100
-    avgResponseTime: 14, // days
-    improvement: {
-      successRate: 2.1,
-      interviewRate: -1.2,
-      applications: 15
-    }
+  // Fetch jobs from API
+  useEffect(() => {
+    const fetchJobs = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/all`);
+        setJobs(response.data);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching jobs:", err);
+        setError("Failed to load job data. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJobs();
+  }, []);
+
+  // Process job data for analytics
+  const processJobData = () => {
+    if (jobs.length === 0) return {
+      overallStats: {},
+      monthlyData: [],
+      applicationStatusData: [],
+      positionTypeAnalysis: [],
+      responseTimeData: [],
+      weeklyTrendData: [],
+      topPerformingCompanies: []
+    };
+
+    // Calculate overall statistics
+    const totalApplications = jobs.length;
+    const accepted = jobs.filter(job => job.status === 'Offer').length;
+    const rejected = jobs.filter(job => job.status === 'Rejected').length;
+    const pending = jobs.filter(job => job.status === 'Applied').length;
+    const interviews = jobs.filter(job => job.status === 'Interview').length;
+    const offers = jobs.filter(job => job.status === 'Offer').length;
+    
+    const successRate = totalApplications > 0 ? (accepted / totalApplications) * 100 : 0;
+    const interviewRate = totalApplications > 0 ? (interviews / totalApplications) * 100 : 0;
+    const offerRate = totalApplications > 0 ? (offers / totalApplications) * 100 : 0;
+    
+    // Calculate average response time (days from application to last update)
+    const responseTimes = jobs.map(job => {
+      const appDate = new Date(job.applicationDate);
+      const updateDate = new Date(job.updatedAt);
+      return Math.ceil((updateDate - appDate) / (1000 * 60 * 60 * 24));
+    });
+    const avgResponseTime = responseTimes.length > 0 
+      ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) 
+      : 0;
+
+    // Group by month
+    const monthlyMap = {};
+    jobs.forEach(job => {
+      const date = new Date(job.applicationDate);
+      const monthKey = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+      
+      if (!monthlyMap[monthKey]) {
+        monthlyMap[monthKey] = {
+          month: monthKey,
+          applications: 0,
+          interviews: 0,
+          offers: 0,
+          rejected: 0,
+          pending: 0
+        };
+      }
+      
+      monthlyMap[monthKey].applications += 1;
+      
+      if (job.status === 'Interview') monthlyMap[monthKey].interviews += 1;
+      if (job.status === 'Offer') monthlyMap[monthKey].offers += 1;
+      if (job.status === 'Rejected') monthlyMap[monthKey].rejected += 1;
+      if (job.status === 'Applied') monthlyMap[monthKey].pending += 1;
+    });
+    
+    const monthlyData = Object.values(monthlyMap).sort((a, b) => {
+      const dateA = new Date(a.month);
+      const dateB = new Date(b.month);
+      return dateA - dateB;
+    });
+
+    // Application status distribution
+    const applicationStatusData = [
+      { name: 'Accepted', value: accepted, color: '#10B981' },
+      { name: 'Rejected', value: rejected, color: '#EF4444' },
+      { name: 'Pending', value: pending, color: '#F59E0B' },
+      { name: 'Interviews', value: interviews, color: '#3B82F6' }
+    ];
+
+    // Group by position type
+    const positionMap = {};
+    jobs.forEach(job => {
+      const position = job.position || 'Unknown';
+      if (!positionMap[position]) {
+        positionMap[position] = {
+          position,
+          applications: 0,
+          interviews: 0,
+          offers: 0
+        };
+      }
+      
+      positionMap[position].applications += 1;
+      if (job.status === 'Interview') positionMap[position].interviews += 1;
+      if (job.status === 'Offer') positionMap[position].offers += 1;
+    });
+    
+    const positionTypeAnalysis = Object.values(positionMap).map(item => ({
+      ...item,
+      successRate: item.applications > 0 ? (item.offers / item.applications) * 100 : 0
+    })).sort((a, b) => b.applications - a.applications).slice(0, 5);
+
+    // Response time distribution
+    const responseTimeMap = {
+      '1-3 days': 0,
+      '4-7 days': 0,
+      '1-2 weeks': 0,
+      '2-4 weeks': 0,
+      '1+ months': 0
+    };
+    
+    responseTimes.forEach(days => {
+      if (days <= 3) responseTimeMap['1-3 days'] += 1;
+      else if (days <= 7) responseTimeMap['4-7 days'] += 1;
+      else if (days <= 14) responseTimeMap['1-2 weeks'] += 1;
+      else if (days <= 30) responseTimeMap['2-4 weeks'] += 1;
+      else responseTimeMap['1+ months'] += 1;
+    });
+    
+    const responseTimeData = Object.entries(responseTimeMap).map(([timeRange, count]) => ({
+      timeRange,
+      count,
+      percentage: totalApplications > 0 ? (count / totalApplications) * 100 : 0
+    }));
+
+    // Group by week
+    const weeklyMap = {};
+    jobs.forEach(job => {
+      const date = new Date(job.applicationDate);
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - date.getDay());
+      const weekKey = `Week ${Math.ceil((date - new Date(date.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))}`;
+      
+      if (!weeklyMap[weekKey]) {
+        weeklyMap[weekKey] = {
+          week: weekKey,
+          applications: 0,
+          interviews: 0,
+          offers: 0
+        };
+      }
+      
+      weeklyMap[weekKey].applications += 1;
+      if (job.status === 'Interview') weeklyMap[weekKey].interviews += 1;
+      if (job.status === 'Offer') weeklyMap[weekKey].offers += 1;
+    });
+    
+    const weeklyTrendData = Object.values(weeklyMap).sort((a, b) => {
+      const weekA = parseInt(a.week.replace('Week ', ''));
+      const weekB = parseInt(b.week.replace('Week ', ''));
+      return weekA - weekB;
+    }).slice(-4); // Get last 4 weeks
+
+    // Top performing companies
+    const companyMap = {};
+    jobs.forEach(job => {
+      const company = job.company;
+      if (!companyMap[company]) {
+        companyMap[company] = {
+          company,
+          applications: 0,
+          interviews: 0,
+          offers: 0
+        };
+      }
+      
+      companyMap[company].applications += 1;
+      if (job.status === 'Interview') companyMap[company].interviews += 1;
+      if (job.status === 'Offer') companyMap[company].offers += 1;
+    });
+    
+    const topPerformingCompanies = Object.values(companyMap)
+      .map(company => ({
+        ...company,
+        rate: company.applications > 0 ? (company.interviews / company.applications) * 100 : 0
+      }))
+      .sort((a, b) => b.rate - a.rate)
+      .slice(0, 5);
+
+    return {
+      overallStats: {
+        totalApplications,
+        accepted,
+        rejected,
+        pending,
+        interviews,
+        offers,
+        successRate,
+        interviewRate,
+        offerRate,
+        avgResponseTime,
+        improvement: {
+          successRate: 2.1,
+          interviewRate: -1.2,
+          applications: 15
+        }
+      },
+      monthlyData,
+      applicationStatusData,
+      positionTypeAnalysis,
+      responseTimeData,
+      weeklyTrendData,
+      topPerformingCompanies
+    };
   };
 
-  const monthlyData = [
-    { month: 'Jan', applications: 18, interviews: 2, offers: 1, rejected: 12, pending: 3 },
-    { month: 'Feb', applications: 22, interviews: 3, offers: 0, rejected: 15, pending: 4 },
-    { month: 'Mar', applications: 25, interviews: 4, offers: 2, rejected: 16, pending: 3 },
-    { month: 'Apr', applications: 20, interviews: 2, offers: 1, rejected: 13, pending: 4 },
-    { month: 'May', applications: 28, interviews: 3, offers: 1, rejected: 19, pending: 5 },
-    { month: 'Jun', applications: 32, interviews: 4, offers: 1, rejected: 14, pending: 13 }
-  ];
-
-  const applicationStatusData = [
-    { name: 'Accepted', value: 12, color: '#10B981' },
-    { name: 'Rejected', value: 89, color: '#EF4444' },
-    { name: 'Pending', value: 44, color: '#F59E0B' }
-  ];
-
-  const companyTypeAnalysis = [
-    { type: 'Startups', applications: 45, interviews: 8, offers: 3, successRate: 17.8 },
-    { type: 'Mid-size', applications: 62, interviews: 7, offers: 2, successRate: 11.3 },
-    { type: 'Enterprise', applications: 38, interviews: 3, offers: 1, successRate: 7.9 }
-  ];
-
-  const positionTypeAnalysis = [
-    { position: 'Frontend', applications: 38, interviews: 6, offers: 2, successRate: 15.8 },
-    { position: 'Backend', applications: 32, interviews: 4, offers: 1, successRate: 12.5 },
-    { position: 'Full Stack', applications: 41, interviews: 5, offers: 2, successRate: 12.2 },
-    { position: 'DevOps', applications: 18, interviews: 2, offers: 1, successRate: 11.1 },
-    { position: 'Data Science', applications: 16, interviews: 1, offers: 0, successRate: 6.3 }
-  ];
-
-  const responseTimeData = [
-    { timeRange: '1-3 days', count: 15, percentage: 10.3 },
-    { timeRange: '4-7 days', count: 28, percentage: 19.3 },
-    { timeRange: '1-2 weeks', count: 42, percentage: 29.0 },
-    { timeRange: '2-4 weeks', count: 35, percentage: 24.1 },
-    { timeRange: '1+ months', count: 25, percentage: 17.2 }
-  ];
-
-  const weeklyTrendData = [
-    { week: 'Week 1', applications: 8, interviews: 1, offers: 0 },
-    { week: 'Week 2', applications: 12, interviews: 2, offers: 1 },
-    { week: 'Week 3', applications: 15, interviews: 1, offers: 0 },
-    { week: 'Week 4', applications: 10, interviews: 3, offers: 1 }
-  ];
-
-  const topPerformingCompanies = [
-    { company: 'TechCorp Inc.', applications: 3, interviews: 2, offers: 1, rate: 66.7 },
-    { company: 'InnovateLab', applications: 2, interviews: 1, offers: 1, rate: 50.0 },
-    { company: 'StartupXYZ', applications: 4, interviews: 2, offers: 0, rate: 50.0 },
-    { company: 'DataTech', applications: 3, interviews: 1, offers: 0, rate: 33.3 },
-    { company: 'CloudFirst', applications: 2, interviews: 1, offers: 0, rate: 50.0 }
-  ];
+  const {
+    overallStats,
+    monthlyData,
+    applicationStatusData,
+    positionTypeAnalysis,
+    responseTimeData,
+    weeklyTrendData,
+    topPerformingCompanies
+  } = processJobData();
 
   const formatPercentage = (value) => `${value.toFixed(1)}%`;
 
@@ -133,6 +295,37 @@ const AnalyticsDashboard = () => {
     return null;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-lg font-medium text-gray-900">Loading analytics data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="bg-red-100 rounded-full p-4 w-16 h-16 flex items-center justify-center mx-auto mb-4">
+            <XCircle className="h-8 w-8 text-red-500" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -169,7 +362,7 @@ const AnalyticsDashboard = () => {
             value={overallStats.totalApplications}
             icon={Eye}
             trend="up"
-            trendValue={overallStats.improvement.applications}
+            trendValue={overallStats.improvement?.applications}
             color="blue"
           />
           <StatCard
@@ -177,7 +370,7 @@ const AnalyticsDashboard = () => {
             value={formatPercentage(overallStats.successRate)}
             icon={Target}
             trend="up"
-            trendValue={overallStats.improvement.successRate}
+            trendValue={overallStats.improvement?.successRate}
             color="green"
           />
           <StatCard
@@ -185,7 +378,7 @@ const AnalyticsDashboard = () => {
             value={formatPercentage(overallStats.interviewRate)}
             icon={Users}
             trend="down"
-            trendValue={overallStats.improvement.interviewRate}
+            trendValue={overallStats.improvement?.interviewRate}
             color="purple"
           />
           <StatCard
@@ -204,8 +397,8 @@ const AnalyticsDashboard = () => {
                 <CheckCircle className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Accepted</p>
-                <p className="text-lg font-semibold text-gray-900">{overallStats.accepted}</p>
+                <p className="text-sm text-gray-600">Offers</p>
+                <p className="text-lg font-semibold text-gray-900">{overallStats.offers}</p>
               </div>
             </div>
           </div>
@@ -331,30 +524,40 @@ const AnalyticsDashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Company Type Analysis */}
+          {/* Weekly Trends */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Performance by Company Size</h3>
-            <div className="space-y-4">
-              {companyTypeAnalysis.map((company, index) => (
-                <div key={index} className="border-b border-gray-100 pb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium text-gray-900">{company.type}</span>
-                    <span className="text-sm font-semibold text-green-600">
-                      {formatPercentage(company.successRate)}
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-600 mb-2">
-                    {company.applications} applications • {company.interviews} interviews • {company.offers} offers
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full" 
-                      style={{ width: `${company.successRate}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Weekly Application Trends</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={weeklyTrendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" />
+                <YAxis />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="applications" 
+                  stroke="#3B82F6" 
+                  strokeWidth={2}
+                  name="Applications"
+                  activeDot={{ r: 8 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="interviews" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  name="Interviews"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="offers" 
+                  stroke="#F59E0B" 
+                  strokeWidth={2}
+                  name="Offers"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
@@ -410,7 +613,7 @@ const AnalyticsDashboard = () => {
 
         {/* Insights and Recommendations */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">AI-Powered Insights & Recommendations</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Insights & Recommendations</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="p-4 bg-green-50 rounded-lg border border-green-200">
               <div className="flex items-center space-x-2 mb-2">
@@ -418,8 +621,11 @@ const AnalyticsDashboard = () => {
                 <span className="font-medium text-green-800">Strong Performance</span>
               </div>
               <p className="text-sm text-green-700">
-                Your success rate with startups (17.8%) is significantly higher than enterprise companies. 
-                Consider focusing more on startup applications.
+                {positionTypeAnalysis.length > 0 && positionTypeAnalysis[0].successRate > 10 ? (
+                  `Your success rate with ${positionTypeAnalysis[0].position} positions (${formatPercentage(positionTypeAnalysis[0].successRate)}) is significantly higher than other positions. Consider focusing more on these roles.`
+                ) : (
+                  "Your application strategy is showing positive results. Continue with your current approach while optimizing for higher response rates."
+                )}
               </p>
             </div>
             
@@ -429,8 +635,11 @@ const AnalyticsDashboard = () => {
                 <span className="font-medium text-blue-800">Optimization Opportunity</span>
               </div>
               <p className="text-sm text-blue-700">
-                Frontend positions show the highest success rate (15.8%). Your skills align well with 
-                these roles - consider applying to more frontend positions.
+                {overallStats.interviewRate > 10 ? (
+                  `Your interview rate is ${formatPercentage(overallStats.interviewRate)}. Focus on improving interview skills to convert more interviews to offers.`
+                ) : (
+                  "Consider refining your application materials to increase your interview rate. Tailoring your resume to each job posting can significantly improve results."
+                )}
               </p>
             </div>
             
@@ -440,8 +649,11 @@ const AnalyticsDashboard = () => {
                 <span className="font-medium text-yellow-800">Response Pattern</span>
               </div>
               <p className="text-sm text-yellow-700">
-                29% of companies respond within 1-2 weeks. Follow up on applications that haven't 
-                responded after 2 weeks to improve your visibility.
+                {responseTimeData.length > 0 && responseTimeData[1].percentage > 20 ? (
+                  `${responseTimeData[1].percentage}% of companies respond within 4-7 days. Follow up on applications that haven't responded after 2 weeks to improve your visibility.`
+                ) : (
+                  "The average response time is " + overallStats.avgResponseTime + " days. Consider following up on applications after 2 weeks if you haven't heard back."
+                )}
               </p>
             </div>
           </div>

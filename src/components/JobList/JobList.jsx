@@ -8,75 +8,107 @@ import {
   Calendar,
   X,
   ExternalLink,
+  Briefcase,
 } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
+
 const JobList = ({
   jobs,
   statuses,
   onEditJob,
   onDeleteJob,
   onViewJob,
-  onStatusChange, // 👈 new handler
+  onStatusChange,
 }) => {
-  const [selectedJob, setSelectedJob] = useState(null); // 👈 modal state
-  const [editingJob, setEditingJob] = useState(null); // for editing
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [editingJob, setEditingJob] = useState(null);
+  const [loading, setLoading] = useState({
+    status: false,
+    update: false,
+    delete: false,
+  });
+  const [errors, setErrors] = useState({});
+
   const getStatusColor = (statusId) => {
-    console.log("Getting color for status:", statusId);
-    const status = statuses.find(
-      (s) => s.id === statusId
-    );
+    const status = statuses.find((s) => s.id === statusId);
     return status ? status.color : "bg-gray-100 text-gray-800";
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     const options = { year: "numeric", month: "short", day: "numeric" };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  // update only status
   const handleStatusUpdate = async (jobId, newStatus) => {
+    setLoading(prev => ({ ...prev, status: true }));
     try {
       const { data } = await axios.patch(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobId}`,
-        { status: newStatus } // 👈 only updating status
+        { status: newStatus }
       );
       console.log("Status updated:", data);
-      onStatusChange(jobId, newStatus); // keep local state in sync
+      onStatusChange(jobId, newStatus);
     } catch (error) {
       console.error("Error updating status:", error);
       alert("Failed to update status");
+    } finally {
+      setLoading(prev => ({ ...prev, status: false }));
     }
   };
 
-  // handle update form submit
-  const handleUpdateJob = async (jobData) => {
+  const handleUpdateJob = async (e) => {
+    e.preventDefault();
+    setLoading(prev => ({ ...prev, update: true }));
+    setErrors({});
+    
     try {
+      // Validate required fields
+      if (!editingJob.jobTitle || !editingJob.company || !editingJob.position) {
+        setErrors({
+          form: "Job Title, Company, and Position are required fields."
+        });
+        return;
+      }
+
       const { data } = await axios.put(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobData._id}`,
-        jobData
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${editingJob._id}`,
+        editingJob
       );
+      
       alert("Job updated successfully");
+      onEditJob(data);
       setEditingJob(null);
-      window.location.reload(); // temporary, better: update local state
-      return data;
     } catch (error) {
       console.error("Error updating job:", error);
-      alert("Failed to update job");
+      if (error.response?.data?.errors) {
+        setErrors(error.response.data.errors);
+      } else {
+        setErrors({ form: "Failed to update job" });
+      }
+    } finally {
+      setLoading(prev => ({ ...prev, update: false }));
     }
   };
 
   const handleDeleteJob = async (jobId) => {
+    if (!window.confirm("Are you sure you want to delete this job application?")) {
+      return;
+    }
+    
+    setLoading(prev => ({ ...prev, delete: true }));
     try {
       await axios.delete(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/jobs/${jobId}`
       );
       alert("Job deleted successfully");
-      // Refresh page OR remove from local state if jobs are managed here
-      window.location.reload(); // temporary, better: use state update
+      onDeleteJob(jobId);
     } catch (error) {
       console.error("Error deleting job:", error);
       alert("Failed to delete job");
+    } finally {
+      setLoading(prev => ({ ...prev, delete: false }));
     }
   };
 
@@ -126,15 +158,16 @@ const JobList = ({
                             {job.jobTitle}
                           </p>
 
-                          {/* 🔽 Status dropdown */}
+                          {/* Status dropdown */}
                           <select
                             value={job.status}
                             onChange={(e) =>
                               handleStatusUpdate(job._id, e.target.value)
-                            } // 👈 direct call
+                            }
+                            disabled={loading.status}
                             className={`ml-3 inline-flex text-xs leading-5 font-semibold rounded-full px-3 py-1 ${getStatusColor(
                               job.status
-                            )}`}
+                            )} ${loading.status ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             {statuses.map((s) => (
                               <option key={s.id} value={s.id}>
@@ -150,8 +183,12 @@ const JobList = ({
                             {job.company}
                           </div>
                           <div className="flex items-center">
+                            <Briefcase className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
+                            {job.position}
+                          </div>
+                          <div className="flex items-center">
                             <MapPin className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                            {job.location}
+                            {job.location || "N/A"}
                           </div>
                           <div className="flex items-center">
                             <Calendar className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
@@ -164,25 +201,27 @@ const JobList = ({
 
                   <div className="ml-4 flex-shrink-0 flex items-center space-x-2">
                     <button
-                      onClick={() => setSelectedJob(job)} // 👈 open modal
+                      onClick={() => setSelectedJob(job)}
                       className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => setEditingJob(job)} // open edit modal
+                      onClick={() => setEditingJob(job)}
                       className="inline-flex items-center p-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                       title="Edit Job"
                     >
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        onDeleteJob(job._id);
-                        handleDeleteJob(job._id);
-                      }}
-                      className="inline-flex items-center p-2 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+                      onClick={() => handleDeleteJob(job._id)}
+                      disabled={loading.delete}
+                      className={`inline-flex items-center p-2 border rounded-lg text-sm font-medium bg-white ${
+                        loading.delete 
+                          ? 'border-gray-300 text-gray-400 cursor-not-allowed' 
+                          : 'border-red-300 text-red-700 hover:bg-red-50'
+                      }`}
                       title="Delete Job"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -200,12 +239,12 @@ const JobList = ({
                   </div>
                 </div>
 
-                {job.notes && (
+                {job.note && (
                   <div className="mt-3 flex items-start">
                     <p className="text-sm text-gray-600 leading-relaxed">
-                      {job.notes.length > 120
-                        ? `${job.notes.substring(0, 120)}...`
-                        : job.notes}
+                      {job.note.length > 120
+                        ? `${job.note.substring(0, 120)}...`
+                        : job.note}
                     </p>
                   </div>
                 )}
@@ -214,10 +253,11 @@ const JobList = ({
           ))
         )}
       </ul>
+
+      {/* View Job Modal */}
       {selectedJob && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative transform transition-all duration-300 scale-95 animate-scaleIn">
-            {/* Close button with hover effect */}
             <button
               onClick={() => setSelectedJob(null)}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors duration-200"
@@ -226,7 +266,6 @@ const JobList = ({
               <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
             </button>
 
-            {/* Header with gradient accent */}
             <div className="mb-6 pb-4 border-b border-gray-100">
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
                 {selectedJob.jobTitle}
@@ -237,10 +276,21 @@ const JobList = ({
               </div>
             </div>
 
-            {/* Job details with improved layout */}
             <div className="space-y-4">
               <div className="flex items-start p-3 bg-gray-50 rounded-lg">
-                <MapPin className="h-5 w-5 mr-3 text-blue-500 mt-0.5" />
+                <Briefcase className="h-5 w-5 mr-3 text-blue-500 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Position
+                  </p>
+                  <p className="text-gray-800">
+                    {selectedJob.position || "N/A"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start p-3 bg-gray-50 rounded-lg">
+                <MapPin className="h-5 w-5 mr-3 text-green-500 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Location
@@ -252,7 +302,7 @@ const JobList = ({
               </div>
 
               <div className="flex items-start p-3 bg-gray-50 rounded-lg">
-                <Calendar className="h-5 w-5 mr-3 text-green-500 mt-0.5" />
+                <Calendar className="h-5 w-5 mr-3 text-purple-500 mt-0.5" />
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Applied
@@ -263,17 +313,35 @@ const JobList = ({
                 </div>
               </div>
 
-              {selectedJob.notes && (
+              <div className="flex items-start p-3 bg-gray-50 rounded-lg">
+                <div className="h-5 w-5 mr-3 mt-0.5 flex items-center justify-center">
+                  <span className={`inline-block w-3 h-3 rounded-full ${
+                    selectedJob.status === "Applied" ? "bg-blue-500" :
+                    selectedJob.status === "Interview" ? "bg-yellow-500" :
+                    selectedJob.status === "Offer" ? "bg-green-500" :
+                    "bg-red-500"
+                  }`}></span>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </p>
+                  <p className="text-gray-800">
+                    {selectedJob.status}
+                  </p>
+                </div>
+              </div>
+
+              {selectedJob.note && (
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <p className="text-xs font-medium text-blue-700 uppercase tracking-wider mb-1">
                     Notes
                   </p>
-                  <p className="text-gray-700">{selectedJob.notes}</p>
+                  <p className="text-gray-700">{selectedJob.note}</p>
                 </div>
               )}
             </div>
 
-            {/* Action button with improved styling */}
             {selectedJob.jobLink && (
               <a
                 href={selectedJob.jobLink}
@@ -289,7 +357,7 @@ const JobList = ({
         </div>
       )}
 
-      {/* Update Application Modal */}
+      {/* Edit Job Modal */}
       {editingJob && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative transform transition-all duration-300 scale-95 animate-scaleIn">
@@ -305,49 +373,68 @@ const JobList = ({
               Update Application
             </h2>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                onEditJob(editingJob);
-                setEditingJob(null);
-                handleUpdateJob(editingJob);
-              }}
-              className="space-y-5"
-            >
+            {errors.form && (
+              <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+                {errors.form}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateJob} className="space-y-5">
               {/* Job Title */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Job Title
+                  Job Title *
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editingJob.jobTitle}
-                    onChange={(e) =>
-                      setEditingJob({ ...editingJob, jobTitle: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter job title"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editingJob.jobTitle}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, jobTitle: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  placeholder="Enter job title"
+                />
+                {errors.jobTitle && (
+                  <p className="mt-1 text-sm text-red-600">{errors.jobTitle}</p>
+                )}
               </div>
 
               {/* Company */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Company
+                  Company *
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editingJob.company}
-                    onChange={(e) =>
-                      setEditingJob({ ...editingJob, company: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter company name"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editingJob.company}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, company: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  placeholder="Enter company name"
+                />
+                {errors.company && (
+                  <p className="mt-1 text-sm text-red-600">{errors.company}</p>
+                )}
+              </div>
+
+              {/* Position */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position *
+                </label>
+                <input
+                  type="text"
+                  value={editingJob.position}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, position: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  placeholder="Enter position"
+                />
+                {errors.position && (
+                  <p className="mt-1 text-sm text-red-600">{errors.position}</p>
+                )}
               </div>
 
               {/* Location */}
@@ -355,17 +442,15 @@ const JobList = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Location
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editingJob.location}
-                    onChange={(e) =>
-                      setEditingJob({ ...editingJob, location: e.target.value })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                    placeholder="Enter job location"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editingJob.location}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, location: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  placeholder="Enter job location"
+                />
               </div>
 
               {/* Application Date */}
@@ -373,25 +458,59 @@ const JobList = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Application Date
                 </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={
-                      editingJob.applicationDate
-                        ? new Date(editingJob.applicationDate)
-                            .toISOString()
-                            .split("T")[0]
-                        : ""
-                    }
-                    onChange={(e) =>
-                      setEditingJob({
-                        ...editingJob,
-                        applicationDate: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                  />
-                </div>
+                <input
+                  type="date"
+                  value={
+                    editingJob.applicationDate
+                      ? new Date(editingJob.applicationDate)
+                          .toISOString()
+                          .split("T")[0]
+                      : ""
+                  }
+                  onChange={(e) =>
+                    setEditingJob({
+                      ...editingJob,
+                      applicationDate: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={editingJob.status}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, status: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                >
+                  {statuses.map((status) => (
+                    <option key={status.id} value={status.id}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Job Link */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Job Link
+                </label>
+                <input
+                  type="url"
+                  value={editingJob.jobLink}
+                  onChange={(e) =>
+                    setEditingJob({ ...editingJob, jobLink: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  placeholder="https://example.com/job-posting"
+                />
               </div>
 
               {/* Notes */}
@@ -400,9 +519,9 @@ const JobList = ({
                   Notes
                 </label>
                 <textarea
-                  value={editingJob.notes}
+                  value={editingJob.note}
                   onChange={(e) =>
-                    setEditingJob({ ...editingJob, notes: e.target.value })
+                    setEditingJob({ ...editingJob, note: e.target.value })
                   }
                   rows={3}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
@@ -421,9 +540,10 @@ const JobList = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 shadow-md hover:shadow-lg"
+                  disabled={loading.update}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-indigo-800 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  Save Changes
+                  {loading.update ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>

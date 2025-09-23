@@ -25,7 +25,7 @@ const JobTrackerDashboard = () => {
     totalApplications: 0,
     interviews: 0,
     offers: 0,
-    pending: 0,
+    applied: 0, // Changed from pending to applied
     rejected: 0,
     weeklyTotal: 0,
     weeklyInterviews: 0,
@@ -45,16 +45,16 @@ const JobTrackerDashboard = () => {
 
         const jobs = response.data;
 
-        // Normalize status for consistency
+        // Normalize status to match backend model
         const normalizeStatus = (status) => {
           if (!status) return "unknown";
-          const s = status.toLowerCase();
-          if (s.includes("Interviewing")) return "interview";
-          if (s.includes("Offer")) return "offer";
-          if (s.includes("Pending")) return "pending";
-          if (s.includes("Rejected")) return "rejected";
-          if (s.includes("Applied")) return "applied";
-          return "unknown";
+          switch (status) {
+            case "Applied": return "applied";
+            case "Interview": return "interview";
+            case "Offer": return "offer";
+            case "Rejected": return "rejected";
+            default: return "unknown";
+          }
         };
 
         const jobsWithNormalizedStatus = jobs.map((job) => ({
@@ -70,8 +70,8 @@ const JobTrackerDashboard = () => {
         const offers = jobsWithNormalizedStatus.filter(
           (j) => j.status === "offer"
         ).length;
-        const pending = jobsWithNormalizedStatus.filter(
-          (j) => j.status === "pending"
+        const applied = jobsWithNormalizedStatus.filter(
+          (j) => j.status === "applied"
         ).length;
         const rejected = jobsWithNormalizedStatus.filter(
           (j) => j.status === "rejected"
@@ -97,7 +97,7 @@ const JobTrackerDashboard = () => {
           totalApplications: total,
           interviews,
           offers,
-          pending,
+          applied, // Changed from pending to applied
           rejected,
           weeklyTotal,
           weeklyInterviews,
@@ -112,7 +112,7 @@ const JobTrackerDashboard = () => {
           totalApplications: 0,
           interviews: 0,
           offers: 0,
-          pending: 0,
+          applied: 0, // Changed from pending to applied
           rejected: 0,
           weeklyTotal: 0,
           weeklyInterviews: 0,
@@ -123,7 +123,7 @@ const JobTrackerDashboard = () => {
     fetchApplications();
   }, []);
 
-  // Filter and search functionality with case-insensitive status matching
+  // Filter and search functionality
   useEffect(() => {
     let filtered = applications;
 
@@ -148,16 +148,14 @@ const JobTrackerDashboard = () => {
   const getStatusColor = (status) => {
     const normalizedStatus = status?.toLowerCase();
     switch (normalizedStatus) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "applied": // Changed from pending to applied
+        return "bg-purple-100 text-purple-800 border-purple-200";
       case "interview":
         return "bg-blue-100 text-blue-800 border-blue-200";
       case "offer":
         return "bg-green-100 text-green-800 border-green-200";
       case "rejected":
         return "bg-red-100 text-red-800 border-red-200";
-      case "applied":
-        return "bg-purple-100 text-purple-800 border-purple-200";
       default:
         return "bg-gray-100 text-gray-800 border-gray-200";
     }
@@ -166,15 +164,13 @@ const JobTrackerDashboard = () => {
   const getStatusIcon = (status) => {
     const normalizedStatus = status?.toLowerCase();
     switch (normalizedStatus) {
-      case "pending":
-        return <Clock className="h-4 w-4" />;
+      case "applied": // Changed from pending to applied
+        return <FileText className="h-4 w-4" />;
       case "interview":
         return <Calendar className="h-4 w-4" />;
       case "offer":
         return <CheckCircle className="h-4 w-4" />;
       case "rejected":
-        return <FileText className="h-4 w-4" />;
-      case "applied":
         return <FileText className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
@@ -184,7 +180,7 @@ const JobTrackerDashboard = () => {
   // Sort applications by created date (most recent first) and limit display
   const recentApplications = [...filteredApplications]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 9); // Show more applications
+    .slice(0, 9);
 
   // Format date helper
   const formatDate = (dateString) => {
@@ -311,18 +307,18 @@ const JobTrackerDashboard = () => {
 
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-200 hover:shadow-xl transition-shadow duration-300">
             <div className="flex items-center">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl shadow-lg">
-                <Clock className="h-6 w-6 text-white" />
+              <div className="p-3 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-xl shadow-lg">
+                <FileText className="h-6 w-6 text-white" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-slate-600">Pending</p>
+                <p className="text-sm font-medium text-slate-600">Applied</p>
                 <p className="text-3xl font-bold text-slate-900">
-                  {stats.pending}
+                  {stats.applied}
                 </p>
                 <div className="flex items-center mt-1">
-                  <Clock className="h-4 w-4 text-blue-500 mr-1" />
-                  <span className="text-sm text-blue-600">
-                    {stats.pending > 0 ? "Awaiting response" : "All caught up!"}
+                  <Clock className="h-4 w-4 text-purple-500 mr-1" />
+                  <span className="text-sm text-purple-600">
+                    {stats.applied > 0 ? "Awaiting response" : "All caught up!"}
                   </span>
                 </div>
               </div>
@@ -351,7 +347,7 @@ const JobTrackerDashboard = () => {
                 className="pl-10 pr-8 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 appearance-none bg-white"
               >
                 <option value="all">All Status</option>
-                <option value="pending">Pending</option>
+                <option value="applied">Applied</option>
                 <option value="interview">Interview</option>
                 <option value="offer">Offer</option>
                 <option value="rejected">Rejected</option>
@@ -386,9 +382,9 @@ const JobTrackerDashboard = () => {
                         {app.company || "Company not specified"}
                       </p>
                     </div>
-                    {app.applicationUrl && (
+                    {app.jobLink && ( // Changed from applicationUrl to jobLink to match backend
                       <a
-                        href={app.applicationUrl}
+                        href={app.jobLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
